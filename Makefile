@@ -1,4 +1,4 @@
-CFLAGS = -m32 -std=c11 -ffreestanding -nostdlib -Wl,--build-id=none -Wall
+CFLAGS = -m32 -std=c11 -ffreestanding -nostdlib -Wl,--build-id=none -Wall -Wextra
 LDFLAGS = -Wl,--build-id=none -lgcc
 ASFLAGS = --32 -march=i686
 
