@@ -1,4 +1,4 @@
-CFLAGS = -m32 -std=c11 -ffreestanding -nostdlib -Wl,--build-id=none -Wall -Wextra
+CFLAGS = -m32 -std=c11 -ffreestanding -fno-stack-protector -nostdlib -Wl,--build-id=none -Wall -Wextra
 LDFLAGS = -Wl,--build-id=none -lgcc
 ASFLAGS = --32 -march=i686
 
@@ -13,7 +13,7 @@ boot.o: boot.s
 kernel.o: kernel.c
 
 run: os.iso
-	qemu-system-i386 -cdrom $<
+	qemu-system-x86_64 -cdrom $<
 
 .PHONY: clean
 clean:
