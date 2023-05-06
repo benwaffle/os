@@ -3,6 +3,45 @@
 
 #define NULL ((void*)0)
 
+typedef uint8_t u8;
+typedef uint16_t u16;
+
+typedef struct {
+    u8 type;
+    u8 length;
+    u16 handle;
+} smbios_header;
+
+typedef struct {
+    char magic[4]; // _SM_
+    u8 checksum;
+    u8 length;
+    u8 major;
+    u8 minor;
+    u16 max_struct_size;
+    u8 entry_point_revision;
+    u8 formatted_area[5];
+    u8 ieps_magic[5]; // _DMI_
+    u8 ieps_checksum;
+    u16 table_length;
+    smbios_header *table;
+    u16 num_structs;
+    u8 bcd_revision;
+} smbios_entry;
+
+typedef enum {
+    BIOS_INFO = 0,
+    SYS_INFO = 1,
+    ENCLOSURE = 3,
+    PROCESSOR = 4,
+} smbios_type;
+
+typedef struct {
+    smbios_header header;
+    u8 vendor;
+    u8 version;
+} bios_info;
+
 uint8_t streq(char *a, char *b) {
     while (*a && *b && *a == *b) {
         ++a;
@@ -18,19 +57,37 @@ int memcmp(const char *a, const char *b, uint16_t n) {
     return 0;
 }
 
-char *find_smbios() {
+smbios_header *find_next_header(smbios_header *h) {
+    u8 *mem = (u8*)h + h->length;
+    while (!(mem[0] == 0 && mem[1] == 0))
+        ++mem;
+    mem += 2;
+    return (smbios_header*)mem;
+}
+
+char *get_string(smbios_header *h, u8 index) {
+    char *strings = (char*)h + h->length;
+    for (int i = 0; i < index - 1; ++i) {
+        while (*strings)
+            strings++;
+        strings++;
+    }
+    return strings;
+}
+
+smbios_entry *find_smbios() {
     char *mem = (char*)0xF0000;
     char *end = (char*)0xFFFFFF;
 
     while (mem <= end) {
-        if (memcmp(mem, "_SM_", 4)) {
+        if (memcmp(mem, "_SM_", 4) == 0) {
             uint8_t length = mem[5];
             uint8_t checksum = 0;
             for (int i = 0; i < length; ++i)
                 checksum += mem[i];
 
             if (checksum == 0)
-                return mem;
+                return (smbios_entry*)mem;
         }
 
         mem += 16;
@@ -108,45 +165,91 @@ void printf(char *s, uint32_t i) {
             len++;
             j /= 10;
         }
+        if (len == 0)
+            len = 1;
         char out[len + 1];
         for (int k = 0; k < len; ++k) {
             out[len - k - 1] = (i % 10) + '0';
             i /= 10;
         }
         out[len] = 0;
+
+        color = make_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
         puts(out);
+        color = make_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     } else if (s[1] == 'x') {
-        puts("0x");
         int len = 0;
         int j = i;
         while (j) {
             len++;
             j /= 16;
         }
+        if (len == 0)
+            len = 1;
         char out[len + 1];
         for (int k = 0; k < len; ++k) {
             out[len - k - 1] = hex[i % 16];
             i /= 16;
         }
         out[len] = 0;
+
+        color = make_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+        puts("0x");
         puts(out);
+        color = make_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     }
 }
 
 void kernel_main() {
-    color = make_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     for (int i = 0; i < width * height; ++i)
         putchar(' ');
 
-    char *smbios = find_smbios();
+    color = make_color(VGA_COLOR_BLUE, VGA_COLOR_LIGHT_RED);
+    puts("\
+                          \n\
+ ~~~ Welcome to BenOS ~~~ \n\
+                          \n\
+");
+    color = make_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+
+    smbios_entry *smbios = find_smbios();
 
     if (smbios) {
         puts("smbios found at ");
         printf("%x", (uint32_t)smbios);
         putchar('\n');
+
+        puts("table at ");
+        printf("%x", smbios->table);
+        putchar('\n');
+
+        puts("version ");
+        printf("%d", smbios->major);
+        puts(".");
+        printf("%d", smbios->minor);
+        puts("\n");
+
+        puts("num structs ");
+        printf("%d", smbios->num_structs);
+        puts("\n");
+
+        smbios_header *header = smbios->table;
+        for (int i = 0; i < smbios->num_structs; ++i) {
+            puts("header type ");
+            printf("%d", header->type);
+            puts("\n");
+
+            if (header->type == BIOS_INFO) {
+                bios_info *info = (bios_info*)header;
+                puts("Vendor: ");
+                puts(get_string(header, info->vendor));
+                puts(" version: ");
+                puts(get_string(header, info->version));
+                puts("\n");
+            }
+            header = find_next_header(header);
+        }
     } else {
         puts("smbios not found");
     }
-
-    puts("now what\n");
 }
