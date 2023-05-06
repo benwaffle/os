@@ -3,7 +3,7 @@ CC=i686-elf-gcc
 LD=i686-elf-ld
 
 CFLAGS = -std=c11 -ffreestanding -nostdlib -Wall -Wextra
-LDFLAGS = -lgcc
+LDFLAGS = -lgcc -Wl,--build-id=none
 
 os.iso: os.bin
 	cp $< isodir/boot

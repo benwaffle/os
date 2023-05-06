@@ -5,7 +5,7 @@
 .set CHECKSUM, -(FLAGS + MAGIC)
 
 # multiboot (grub) header
-.section multiboot
+.section .multiboot
 .align 4
 .long MAGIC
 .long FLAGS
