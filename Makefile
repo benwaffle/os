@@ -1,6 +1,9 @@
-CFLAGS = -m32 -std=c11 -ffreestanding -fno-stack-protector -nostdlib -Wl,--build-id=none -Wall -Wextra
-LDFLAGS = -Wl,--build-id=none -lgcc
-ASFLAGS = --32 -march=i686
+AS=i686-elf-as
+CC=i686-elf-gcc
+LD=i686-elf-ld
+
+CFLAGS = -std=c11 -ffreestanding -nostdlib -Wall -Wextra
+LDFLAGS = -lgcc
 
 os.iso: os.bin
 	cp $< isodir/boot
