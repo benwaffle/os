@@ -1,3 +1,4 @@
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -157,49 +158,61 @@ void puts(char *s) {
 
 const char *hex = "0123456789abcdef";
 
-void printf(char *s, uint32_t i) {
-    if (s[1] == 'd') {
-        int len = 0;
-        int j = i;
-        while (j) {
-            len++;
-            j /= 10;
-        }
-        if (len == 0)
-            len = 1;
-        char out[len + 1];
-        for (int k = 0; k < len; ++k) {
-            out[len - k - 1] = (i % 10) + '0';
-            i /= 10;
-        }
-        out[len] = 0;
+int numeric_width(int i, int base) {
+    int len = 0;
 
-        vga_color old = color;
-        color = make_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-        puts(out);
-        color = old;
-    } else if (s[1] == 'x') {
-        int len = 0;
-        int j = i;
-        while (j) {
-            len++;
-            j /= 16;
-        }
-        if (len == 0)
-            len = 1;
-        char out[len + 1];
-        for (int k = 0; k < len; ++k) {
-            out[len - k - 1] = hex[i % 16];
-            i /= 16;
-        }
-        out[len] = 0;
-
-        vga_color old = color;
-        color = make_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-        puts("0x");
-        puts(out);
-        color = old;
+    while (i) {
+        len++;
+        i /= base;
     }
+
+    if (len == 0)
+        len = 1;
+    return len;
+}
+
+void print_number(int i, int base) {
+    int len = numeric_width(i, base);
+    char out[len + 1];
+    for (int k = 0; k < len; ++k) {
+        out[len - k - 1] = hex[i % base];
+        i /= base;
+    }
+    out[len] = 0;
+    puts(out);
+}
+
+void printf(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+
+    while (*fmt) {
+        if (fmt[0] == '%') {
+            if (fmt[1] == 'd') {
+                vga_color old = color;
+                color = make_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+                print_number(va_arg(args, int), 10);
+                color = old;
+            } else if (fmt[1] == 'x') {
+                vga_color old = color;
+                color = make_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+                puts("0x");
+                print_number(va_arg(args, int), 16);
+                color = old;
+            } else if (fmt[1] == 's') {
+                puts(va_arg(args, char*));
+            } else {
+                puts("%?");
+            }
+            ++fmt;
+        } else {
+            putchar(*fmt);
+        }
+
+        ++fmt;
+    }
+
+    va_end(args);
 }
 
 void kernel_main() {
@@ -208,7 +221,7 @@ void kernel_main() {
         putchar(' ');
 
     color = make_color(VGA_COLOR_BLUE, VGA_COLOR_LIGHT_RED);
-    puts("\
+    printf("\
                           \n\
  ~~~ Welcome to BenOS ~~~ \n\
                           \n\
@@ -218,41 +231,24 @@ void kernel_main() {
     smbios_entry *smbios = find_smbios();
 
     if (smbios) {
-        puts("smbios found at ");
-        printf("%x", (uint32_t)smbios);
-        putchar('\n');
+        printf("smbios found at %x\n", smbios);
+        printf("table at %x\n", smbios->table);
+        printf("version %d.%d\n", smbios->major, smbios->minor);
+        printf("%d structs\n", smbios->num_structs);
 
-        puts("table at ");
-        printf("%x", smbios->table);
-        putchar('\n');
-
-        puts("version ");
-        printf("%d", smbios->major);
-        puts(".");
-        printf("%d", smbios->minor);
-        puts("\n");
-
-        puts("num structs ");
-        printf("%d", smbios->num_structs);
-        puts("\n");
+        printf("\n");
 
         smbios_header *header = smbios->table;
         for (int i = 0; i < smbios->num_structs; ++i) {
-            puts("header type ");
-            printf("%d", header->type);
-            puts("\n");
+            printf("header type %d\n", header->type);
 
             if (header->type == BIOS_INFO) {
                 bios_info *info = (bios_info*)header;
-                puts("Vendor: ");
-                puts(get_string(header, info->vendor));
-                puts(" version: ");
-                puts(get_string(header, info->version));
-                puts("\n");
+                printf("Vendor [%s], version [%s]\n", get_string(header, info->vendor), get_string(header, info->version));
             }
             header = find_next_header(header);
         }
     } else {
-        puts("smbios not found");
+        printf("smbios not found");
     }
 }
