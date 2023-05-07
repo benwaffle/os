@@ -174,9 +174,10 @@ void printf(char *s, uint32_t i) {
         }
         out[len] = 0;
 
+        vga_color old = color;
         color = make_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
         puts(out);
-        color = make_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+        color = old;
     } else if (s[1] == 'x') {
         int len = 0;
         int j = i;
@@ -193,14 +194,16 @@ void printf(char *s, uint32_t i) {
         }
         out[len] = 0;
 
+        vga_color old = color;
         color = make_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
         puts("0x");
         puts(out);
-        color = make_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+        color = old;
     }
 }
 
 void kernel_main() {
+    color = make_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     for (int i = 0; i < width * height; ++i)
         putchar(' ');
 
