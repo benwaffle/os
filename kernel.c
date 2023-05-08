@@ -2,6 +2,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "limine.h"
+
 #define NULL ((void*)0)
 
 typedef uint8_t u8;
@@ -42,6 +44,18 @@ typedef struct {
     u8 vendor;
     u8 version;
 } bios_info;
+
+#if 0
+static volatile struct limine_framebuffer_request framebuffer_request = {
+    .id = LIMINE_FRAMEBUFFER_REQUEST,
+    .revision = 0,
+};
+#endif
+
+static volatile struct limine_hhdm_request hhdm = {
+    .id = LIMINE_HHDM_REQUEST,
+    .revision = 0,
+};
 
 uint8_t streq(char *a, char *b) {
     while (*a && *b && *a == *b) {
@@ -96,6 +110,31 @@ smbios_entry *find_smbios() {
     return NULL;
 }
 
+void outb(u16 port, char data) {
+    asm volatile("outb %1, %0" : : "dN" (port), "a" (data));
+}
+
+u8 inb(u16 port) {
+    u8 rv;
+    asm volatile("inb %1, %0" : "=a" (rv) : "dN" (port));
+    return rv;
+}
+
+#define COM1 0x3f8
+
+void init_serial() {
+    outb(COM1 + 1, 0x00);    // Disable all interrupts
+    outb(COM1 + 3, 0x80);    // Enable DLAB (set baud rate divisor)
+    outb(COM1 + 0, 0x03);    // Set divisor to 3 (lo byte) 38400 baud
+    outb(COM1 + 1, 0x00);    //                  (hi byte)
+    outb(COM1 + 3, 0x03);    // 8 bits, no parity, one stop bit
+    //outb(COM1 + 2, 0xC7);    // Enable FIFO, clear them, with 14-byte threshold
+    //outb(COM1 + 4, 0x0B);    // IRQs enabled, RTS/DSR set
+    // set it in normal operation mode
+   // (not-loopback with IRQs enabled and OUT#1 and OUT#2 bits enabled)
+    outb(COM1 + 4, 0x0F);
+}
+
 typedef enum {
     VGA_COLOR_BLACK = 0,
     VGA_COLOR_BLUE = 1,
@@ -123,14 +162,23 @@ uint16_t color_char(unsigned char c, uint8_t color) {
     return (uint16_t) c | (uint16_t) color << 8;
 }
 
-uint16_t *vgatext = (uint16_t*)0xB8000;
+uint16_t *vgatext;// = (uint16_t*)0xB8000;
 uint8_t row = 0;
 uint8_t col = 0;
 vga_color color;
 const int width = 80;
 const int height = 25;
 
+bool serial_tx_empty() {
+    return inb(COM1 + 5) & 0b0100000;
+}
+
 void putchar(char c) {
+    while (!serial_tx_empty())
+        ;
+
+    outb(COM1, c);
+    /*
     if (c == '\n') {
         ++row;
         if (row == height)
@@ -147,6 +195,7 @@ void putchar(char c) {
         if (row == height)
             row = 0;
     }
+    */
 }
 
 void puts(char *s) {
@@ -215,10 +264,33 @@ void printf(const char *fmt, ...) {
     va_end(args);
 }
 
-void kernel_main() {
+#define YES 0x00ff00
+#define NO 0xff0000
+
+void show(bool ans) {
+    #if 0
+    struct limine_framebuffer *fb = framebuffer_request.response->framebuffers[0];
+    // Note: we assume the framebuffer model is RGB with 32-bit pixels.
+    for (u16 i = 0; i < 500; i++) {
+        uint32_t *fb_ptr = fb->address;
+        fb_ptr[i * (fb->pitch / 4) + i] = ans ? YES : NO;
+    }
+    #endif
+}
+
+void _start() {
+
+    //vgatext = (u16*)(hhdm.response->offset + 0xb8000);
+    //vgatext = (u16*)(0xffffffff80000000 + 0xb8000);
+    vgatext = (u16*)0xb8000;
+
     color = make_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+    /*
     for (int i = 0; i < width * height; ++i)
         putchar(' ');
+        */
+
+    //show(1 == 2);
 
     color = make_color(VGA_COLOR_BLUE, VGA_COLOR_LIGHT_RED);
     printf("\
@@ -238,6 +310,7 @@ void kernel_main() {
 
         printf("\n");
 
+        /*
         smbios_header *header = smbios->table;
         for (int i = 0; i < smbios->num_structs; ++i) {
             printf("header type %d\n", header->type);
@@ -248,7 +321,12 @@ void kernel_main() {
             }
             header = find_next_header(header);
         }
+        */
     } else {
         printf("smbios not found");
     }
+
+    asm("cli");
+    while (true)
+        asm("hlt");
 }

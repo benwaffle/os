@@ -1,26 +1,28 @@
-AS=i686-elf-as
-CC=i686-elf-gcc
-LD=i686-elf-ld
+AS=x86_64-elf-as
+CC=x86_64-elf-gcc
+LD=x86_64-elf-ld
 
-CFLAGS = -std=c11 -ffreestanding -nostdlib -Wall -Wextra
-LDFLAGS = -lgcc -Wl,--build-id=none
+CFLAGS = -std=gnu11 -ffreestanding -nostdlib -Wall -Wextra -fPIC
+LDFLAGS = -lgcc
 
 os.iso: os.bin
-	cp $< isodir/boot
-	grub-mkrescue -o os.iso isodir
+	cp $< isodir
+	xorriso -as mkisofs -b limine-cd.bin \
+		-no-emul-boot -boot-load-size 4 -boot-info-table \
+		--efi-boot limine-cd-efi.bin \
+		-efi-boot-part --efi-boot-image --protective-msdos-label \
+		isodir -o $@
 
-os.bin: boot.o kernel.o linker.ld
-	$(CC) $(CFLAGS) $(LDFLAGS) -T linker.ld -o $@ boot.o kernel.o
+os.bin: kernel.o linker.ld
+	$(CC) $(CFLAGS) $(LDFLAGS) -T linker.ld -o $@ kernel.o
 
-boot.o: boot.s
 kernel.o: kernel.c
 
 run: os.iso
-	qemu-system-x86_64 -cdrom $<
+	qemu-system-x86_64 -cdrom $< -serial stdio
 
 .PHONY: clean
 clean:
-	$(RM) boot.o
 	$(RM) kernel.o
 	$(RM) os.bin
 	$(RM) os.iso
