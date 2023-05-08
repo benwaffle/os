@@ -1,4 +1,4 @@
 *.o
 *~
-*.bin
+os.bin
 *.iso
