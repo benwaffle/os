@@ -77,6 +77,15 @@ int memcmp(const char *a, const char *b, uint16_t n) {
     return 0;
 }
 
+unsigned long strlen(const char *s) {
+    size_t len = 0;
+    while (*s) {
+        ++len;
+        ++s;
+    }
+    return len;
+}
+
 smbios_header *find_next_header(smbios_header *h) {
     u8 *mem = (u8*)h + h->length;
     while (!(mem[0] == 0 && mem[1] == 0))
@@ -283,17 +292,25 @@ void show(bool ans) {
     #endif
 }
 
-void draw_pixel(struct limine_framebuffer *fb, uint16_t x, uint16_t y, uint32_t color) {
+void draw_real_pixel(struct limine_framebuffer *fb, uint16_t x, uint16_t y, uint32_t color) {
     uint16_t bytes_per_pixel = fb->bpp / 8;
     uint64_t index = y * fb->pitch + x * bytes_per_pixel;
 
+    ((uint32_t*)fb->address)[index / 4] = color;
+}
+
+void draw_pixel(struct limine_framebuffer *fb, uint16_t x, uint16_t y, uint32_t color) {
     uint8_t red = color >> 16;
     uint8_t green = color >> 8;
     uint8_t blue = color;
 
     uint32_t screen_color = (red << fb->red_mask_shift) | (green << fb->green_mask_shift) | (blue << fb->blue_mask_shift);
 
-    ((uint32_t*)fb->address)[index / 4] = screen_color;
+    // render at 2x
+    draw_real_pixel(fb, x * 2, y * 2, screen_color);
+    draw_real_pixel(fb, x * 2, y * 2 + 1, screen_color);
+    draw_real_pixel(fb, x * 2 + 1, y * 2, screen_color);
+    draw_real_pixel(fb, x * 2 + 1, y * 2 + 1, screen_color);
 }
 
 extern const struct bitmap_font font;
@@ -329,26 +346,30 @@ void _start() {
     //    }
     //}
 
-    char c = '@';
-    int index = 0;
-    for (int i = 0; i < font.Chars; ++i) {
-        if (font.Index[i] == (unsigned)c) {
-            index = i;
-            break;
+    char *s = "~ Welcome to BenOS ~ \"'\\[]\{}|<>?,./;!@#$%^&*()ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    for (size_t i = 0; i < strlen(s); ++i) {
+        int index = 0;
+        for (int j = 0; j < font.Chars; ++j) {
+            if (font.Index[j] == (unsigned)s[i]) {
+                index = j;
+                break;
+            }
         }
-    }
 
-    printf("found index %d\n", index);
-    index *= font.Height * 2;
-    for (int i = 0; i < font.Height * 2; i += 2) {
-        char glyph = font.Bitmap[index + i];
-        printf("glyph [%x]\n", glyph);
-        for (int8_t bit = 7; bit >= 0; --bit) {
-            uint32_t color = ((glyph >> bit) & 1) ? 0xffffff : 0;
-            printf("bit %d, (%d, %d) = %d\n", bit, 8-bit-1, i/2, color);
-            draw_pixel(fb, 8-bit-1, i/2, color);
+        int x = i * font.Widths[index];
+
+        printf("found index %d, width[%d]\n", index, font.Widths[index]);
+        index *= font.Height * 2;
+        for (int j = 0; j < font.Height * 2; j += 2) {
+            char glyph = font.Bitmap[index + j];
+            printf("glyph [%x]\n", glyph);
+            for (int8_t bit = 7; bit >= 0; --bit) {
+                uint32_t color = ((glyph >> bit) & 1) ? 0xffffff : 0;
+                //printf("bit %d, (%d, %d) = %d\n", bit, 8-bit-1, i/2, color);
+                draw_pixel(fb, x + 8-bit-1, j/2, color);
+            }
+            //printf("ok\n");
         }
-        printf("ok\n");
     }
 
     smbios_entry *smbios = find_smbios();
