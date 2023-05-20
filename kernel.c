@@ -149,40 +149,6 @@ void init_serial() {
     outb(COM1 + 4, 0x0F);
 }
 
-typedef enum {
-    VGA_COLOR_BLACK = 0,
-    VGA_COLOR_BLUE = 1,
-    VGA_COLOR_GREEN = 2,
-    VGA_COLOR_CYAN = 3,
-    VGA_COLOR_RED = 4,
-    VGA_COLOR_MAGENTA = 5,
-    VGA_COLOR_BROWN = 6,
-    VGA_COLOR_LIGHT_GREY = 7,
-    VGA_COLOR_DARK_GREY = 8,
-    VGA_COLOR_LIGHT_BLUE = 9,
-    VGA_COLOR_LIGHT_GREEN = 10,
-    VGA_COLOR_LIGHT_CYAN = 11,
-    VGA_COLOR_LIGHT_RED = 12,
-    VGA_COLOR_LIGHT_MAGENTA = 13,
-    VGA_COLOR_LIGHT_BROWN = 14,
-    VGA_COLOR_WHITE = 15,
-} vga_color;
-
-uint8_t make_color(vga_color fg, vga_color bg) {
-    return fg | bg << 4;
-}
-
-uint16_t color_char(unsigned char c, uint8_t color) {
-    return (uint16_t) c | (uint16_t) color << 8;
-}
-
-uint16_t *vgatext;// = (uint16_t*)0xB8000;
-uint8_t row = 0;
-uint8_t col = 0;
-vga_color color;
-const int width = 80;
-const int height = 25;
-
 bool serial_tx_empty() {
     return inb(COM1 + 5) & 0b0100000;
 }
@@ -252,16 +218,10 @@ void printf(const char *fmt, ...) {
     while (*fmt) {
         if (fmt[0] == '%') {
             if (fmt[1] == 'd') {
-                vga_color old = color;
-                color = make_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
                 print_number(va_arg(args, int), 10);
-                color = old;
             } else if (fmt[1] == 'x') {
-                vga_color old = color;
-                color = make_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
                 puts("0x");
                 print_number(va_arg(args, uint64_t), 16);
-                color = old;
             } else if (fmt[1] == 's') {
                 puts(va_arg(args, char*));
             } else {
@@ -276,20 +236,6 @@ void printf(const char *fmt, ...) {
     }
 
     va_end(args);
-}
-
-#define YES 0x00ff00
-#define NO 0xff0000
-
-void show(bool ans) {
-    #if 0
-    struct limine_framebuffer *fb = framebuffer_request.response->framebuffers[0];
-    // Note: we assume the framebuffer model is RGB with 32-bit pixels.
-    for (u16 i = 0; i < 500; i++) {
-        uint32_t *fb_ptr = fb->address;
-        fb_ptr[i * (fb->pitch / 4) + i] = ans ? YES : NO;
-    }
-    #endif
 }
 
 void draw_real_pixel(struct limine_framebuffer *fb, uint16_t x, uint16_t y, uint32_t color) {
@@ -317,36 +263,16 @@ extern const struct bitmap_font font;
 
 void _start() {
 
-    //vgatext = (u16*)(hhdm.response->offset + 0xb8000);
-    //vgatext = (u16*)(0xffffffff80000000 + 0xb8000);
-    vgatext = (u16*)0xb8000;
-
-    color = make_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-    /*
-    for (int i = 0; i < width * height; ++i)
-        putchar(' ');
-        */
-
-    //show(1 == 2);
-
-    color = make_color(VGA_COLOR_BLUE, VGA_COLOR_LIGHT_RED);
     printf("\
                           \n\
  ~~~ Welcome to BenOS ~~~ \n\
                           \n\
 ");
-    color = make_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
     struct limine_framebuffer *fb = *fb_request.response->framebuffers;
     printf("fb %dx%d, pitch[%d], bpp[%d], at %x\n", fb->width, fb->height, fb->pitch, fb->bpp, fb->address);
 
-    //for (uint16_t y = 0; y < fb->height; ++y) {
-    //    for (uint16_t x = 0; x < fb->width; ++x) {
-    //        draw_pixel(fb, x, y, 0x0000ff);
-    //    }
-    //}
-
-    char *s = "~ Welcome to BenOS ~ \"'\\[]\{}|<>?,./;!@#$%^&*()ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    char *s = "~ Welcome to BenOS ~ \"'\\[]{}|<>?,./;!@#$%^&*()ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     for (size_t i = 0; i < strlen(s); ++i) {
         int index = 0;
         for (int j = 0; j < font.Chars; ++j) {
@@ -358,17 +284,13 @@ void _start() {
 
         int x = i * font.Widths[index];
 
-        printf("found index %d, width[%d]\n", index, font.Widths[index]);
         index *= font.Height * 2;
         for (int j = 0; j < font.Height * 2; j += 2) {
             char glyph = font.Bitmap[index + j];
-            printf("glyph [%x]\n", glyph);
             for (int8_t bit = 7; bit >= 0; --bit) {
                 uint32_t color = ((glyph >> bit) & 1) ? 0xffffff : 0;
-                //printf("bit %d, (%d, %d) = %d\n", bit, 8-bit-1, i/2, color);
                 draw_pixel(fb, x + 8-bit-1, j/2, color);
             }
-            //printf("ok\n");
         }
     }
 
