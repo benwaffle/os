@@ -1,52 +1,9 @@
 #include <stdarg.h>
-#include <stdbool.h>
-#include <stdint.h>
 
+#include "types.h"
 #include "uefi.h"
 #include "limine.h"
 #include "font.h"
-
-#define NULL ((void*)0)
-
-typedef uint8_t u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-
-typedef struct {
-    u8 type;
-    u8 length;
-    u16 handle;
-} smbios_header;
-
-typedef struct {
-    char magic[4]; // _SM_
-    u8 checksum;
-    u8 length;
-    u8 major;
-    u8 minor;
-    u16 max_struct_size;
-    u8 entry_point_revision;
-    u8 formatted_area[5];
-    u8 ieps_magic[5]; // _DMI_
-    u8 ieps_checksum;
-    u16 table_length;
-    u32 table;
-    u16 num_structs;
-    u8 bcd_revision;
-} smbios_entry;
-
-typedef enum {
-    BIOS_INFO = 0,
-    SYS_INFO = 1,
-    ENCLOSURE = 3,
-    PROCESSOR = 4,
-} smbios_type;
-
-typedef struct {
-    smbios_header header;
-    u8 vendor;
-    u8 version;
-} bios_info;
 
 static volatile struct limine_framebuffer_request fb_request = {
     .id = LIMINE_FRAMEBUFFER_REQUEST,
@@ -57,53 +14,6 @@ static volatile struct limine_efi_system_table_request efi_request = {
     .id = LIMINE_EFI_SYSTEM_TABLE_REQUEST,
     .revision = 0,
 };
-
-static volatile struct limine_smbios_request smbios_request = {
-    .id = LIMINE_SMBIOS_REQUEST,
-    .revision = 0,
-};
-
-uint8_t streq(char *a, char *b) {
-    while (*a && *b && *a == *b) {
-        ++a;
-        ++b;
-    }
-    return *a == *b;
-}
-
-int memcmp(const char *a, const char *b, uint16_t n) {
-    for (uint16_t i = 0; i < n; ++i)
-        if (a[i] != b[i])
-            return 1;
-    return 0;
-}
-
-unsigned long strlen(const char *s) {
-    size_t len = 0;
-    while (*s) {
-        ++len;
-        ++s;
-    }
-    return len;
-}
-
-smbios_header *find_next_header(smbios_header *h) {
-    u8 *mem = (u8*)h + h->length;
-    while (!(mem[0] == 0 && mem[1] == 0))
-        ++mem;
-    mem += 2;
-    return (smbios_header*)mem;
-}
-
-char *get_string(smbios_header *h, u8 index) {
-    char *strings = (char*)h + h->length;
-    for (int i = 0; i < index - 1; ++i) {
-        while (*strings)
-            strings++;
-        strings++;
-    }
-    return strings;
-}
 
 void outb(u16 port, char data) {
     asm volatile("outb %1, %0" : : "dN" (port), "a" (data));
@@ -242,6 +152,8 @@ void draw_pixel(struct limine_framebuffer *fb, uint16_t x, uint16_t y, uint32_t 
 
 extern const struct bitmap_font font;
 
+extern void print_smbios();
+
 void _start() {
 
     printf("\
@@ -269,35 +181,13 @@ void _start() {
         for (int j = 0; j < font.Height * 2; j += 2) {
             char glyph = font.Bitmap[index + j];
             for (int8_t bit = 7; bit >= 0; --bit) {
-                uint32_t color = ((glyph >> bit) & 1) ? 0xffffff : 0;
+                uint32_t color = ((glyph >> bit) & 1) ? 0x21aeef : 0;
                 draw_pixel(fb, x + 8-bit-1, j/2, color);
             }
         }
     }
 
-    smbios_entry *smbios = smbios_request.response->entry_32;
-
-    if (smbios) {
-        printf("smbios found at %x\n", smbios);
-        printf("table at %x\n", smbios->table);
-        printf("version %d.%d\n", smbios->major, smbios->minor);
-        printf("%d structs\n", smbios->num_structs);
-
-        printf("\n");
-
-        smbios_header *header = (smbios_header*)smbios->table;
-        for (int i = 0; i < smbios->num_structs; ++i) {
-            printf("header type %d\n", header->type);
-
-            if (header->type == BIOS_INFO) {
-                bios_info *info = (bios_info*)header;
-                printf("Vendor [%s], version [%s]\n", get_string(header, info->vendor), get_string(header, info->version));
-            }
-            header = find_next_header(header);
-        }
-    } else {
-        printf("smbios not found\n");
-    }
+    print_smbios();
 
     efi_system_table_t *ST = (efi_system_table_t*)(efi_request.response->address);
     for (uint16_t *c = ST->FirmwareVendor; *c; ++c)

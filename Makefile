@@ -5,6 +5,11 @@ LD=x86_64-elf-ld
 CFLAGS = -std=gnu11 -ffreestanding -nostdlib -Wall -Wextra -fPIC
 LDFLAGS = -lgcc
 
+OBJS = src/kernel.o \
+		src/smbios.o \
+		src/stdlib.o \
+		src/lemon.o
+
 os.iso: os.bin
 	cp $< isodir
 	xorriso -as mkisofs -b limine-cd.bin \
@@ -13,8 +18,8 @@ os.iso: os.bin
 		-efi-boot-part --efi-boot-image --protective-msdos-label \
 		isodir -o $@
 
-os.bin: kernel.o lemon.o linker.ld
-	$(CC) $(CFLAGS) $(LDFLAGS) -T linker.ld -o $@ kernel.o lemon.o
+os.bin: $(OBJS) linker.ld
+	$(CC) $(CFLAGS) $(LDFLAGS) -T linker.ld -o $@ $(OBJS)
 
 run: os.iso
 	qemu-system-x86_64 \
@@ -24,6 +29,6 @@ run: os.iso
 
 .PHONY: clean
 clean:
-	$(RM) kernel.o lemon.o
+	$(RM) $(OBJS)
 	$(RM) os.bin
 	$(RM) os.iso
