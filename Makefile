@@ -19,7 +19,10 @@ os.bin: kernel.o linker.ld
 kernel.o: kernel.c
 
 run: os.iso
-	qemu-system-x86_64 -cdrom $< -serial stdio
+	qemu-system-x86_64 \
+		-drive if=pflash,format=raw,unit=0,file=OVMF_CODE.fd,readonly=on \
+		-drive if=pflash,format=raw,unit=1,file=OVMF_VARS.fd \
+		-cdrom $< -serial stdio
 
 .PHONY: clean
 clean:
