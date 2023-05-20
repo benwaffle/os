@@ -45,12 +45,10 @@ typedef struct {
     u8 version;
 } bios_info;
 
-#if 0
-static volatile struct limine_framebuffer_request framebuffer_request = {
+static volatile struct limine_framebuffer_request fb_request = {
     .id = LIMINE_FRAMEBUFFER_REQUEST,
     .revision = 0,
 };
-#endif
 
 static volatile struct limine_hhdm_request hhdm = {
     .id = LIMINE_HHDM_REQUEST,
@@ -246,7 +244,7 @@ void printf(const char *fmt, ...) {
                 vga_color old = color;
                 color = make_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
                 puts("0x");
-                print_number(va_arg(args, int), 16);
+                print_number(va_arg(args, uint64_t), 16);
                 color = old;
             } else if (fmt[1] == 's') {
                 puts(va_arg(args, char*));
@@ -278,6 +276,19 @@ void show(bool ans) {
     #endif
 }
 
+void draw_pixel(struct limine_framebuffer *fb, uint16_t x, uint16_t y, uint32_t color) {
+    uint16_t bytes_per_pixel = fb->bpp / 8;
+    uint64_t index = y * fb->pitch + x * bytes_per_pixel;
+
+    uint8_t red = color >> 16;
+    uint8_t green = color >> 8;
+    uint8_t blue = color;
+
+    uint32_t screen_color = (red << fb->red_mask_shift) | (green << fb->green_mask_shift) | (blue << fb->blue_mask_shift);
+
+    ((uint32_t*)fb->address)[index / 4] = screen_color;
+}
+
 void _start() {
 
     //vgatext = (u16*)(hhdm.response->offset + 0xb8000);
@@ -299,6 +310,15 @@ void _start() {
                           \n\
 ");
     color = make_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+
+    struct limine_framebuffer *fb = *fb_request.response->framebuffers;
+    printf("fb %dx%d, pitch[%d], bpp[%d], at %x\n", fb->width, fb->height, fb->pitch, fb->bpp, fb->address);
+
+    for (uint16_t y = 0; y < fb->height; ++y) {
+        for (uint16_t x = 0; x < fb->width; ++x) {
+            draw_pixel(fb, x, y, 0x0000ff);
+        }
+    }
 
     smbios_entry *smbios = find_smbios();
 
