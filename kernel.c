@@ -10,6 +10,7 @@
 
 typedef uint8_t u8;
 typedef uint16_t u16;
+typedef uint32_t u32;
 
 typedef struct {
     u8 type;
@@ -29,7 +30,7 @@ typedef struct {
     u8 ieps_magic[5]; // _DMI_
     u8 ieps_checksum;
     u16 table_length;
-    smbios_header *table;
+    u32 table;
     u16 num_structs;
     u8 bcd_revision;
 } smbios_entry;
@@ -57,8 +58,8 @@ static volatile struct limine_efi_system_table_request efi_request = {
     .revision = 0,
 };
 
-static volatile struct limine_hhdm_request hhdm = {
-    .id = LIMINE_HHDM_REQUEST,
+static volatile struct limine_smbios_request smbios_request = {
+    .id = LIMINE_SMBIOS_REQUEST,
     .revision = 0,
 };
 
@@ -102,26 +103,6 @@ char *get_string(smbios_header *h, u8 index) {
         strings++;
     }
     return strings;
-}
-
-smbios_entry *find_smbios() {
-    char *mem = (char*)0xF0000;
-    char *end = (char*)0xFFFFFF;
-
-    while (mem <= end) {
-        if (memcmp(mem, "_SM_", 4) == 0) {
-            uint8_t length = mem[5];
-            uint8_t checksum = 0;
-            for (int i = 0; i < length; ++i)
-                checksum += mem[i];
-
-            if (checksum == 0)
-                return (smbios_entry*)mem;
-        }
-
-        mem += 16;
-    }
-    return NULL;
 }
 
 void outb(u16 port, char data) {
@@ -294,7 +275,7 @@ void _start() {
         }
     }
 
-    smbios_entry *smbios = find_smbios();
+    smbios_entry *smbios = smbios_request.response->entry_32;
 
     if (smbios) {
         printf("smbios found at %x\n", smbios);
@@ -304,8 +285,7 @@ void _start() {
 
         printf("\n");
 
-        /*
-        smbios_header *header = smbios->table;
+        smbios_header *header = (smbios_header*)smbios->table;
         for (int i = 0; i < smbios->num_structs; ++i) {
             printf("header type %d\n", header->type);
 
@@ -315,7 +295,6 @@ void _start() {
             }
             header = find_next_header(header);
         }
-        */
     } else {
         printf("smbios not found\n");
     }
