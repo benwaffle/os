@@ -2,7 +2,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "uefi.h"
 #include "limine.h"
+#include "font.h"
 
 #define NULL ((void*)0)
 
@@ -47,6 +49,11 @@ typedef struct {
 
 static volatile struct limine_framebuffer_request fb_request = {
     .id = LIMINE_FRAMEBUFFER_REQUEST,
+    .revision = 0,
+};
+
+static volatile struct limine_efi_system_table_request efi_request = {
+    .id = LIMINE_EFI_SYSTEM_TABLE_REQUEST,
     .revision = 0,
 };
 
@@ -289,6 +296,8 @@ void draw_pixel(struct limine_framebuffer *fb, uint16_t x, uint16_t y, uint32_t 
     ((uint32_t*)fb->address)[index / 4] = screen_color;
 }
 
+extern const struct bitmap_font font;
+
 void _start() {
 
     //vgatext = (u16*)(hhdm.response->offset + 0xb8000);
@@ -314,10 +323,32 @@ void _start() {
     struct limine_framebuffer *fb = *fb_request.response->framebuffers;
     printf("fb %dx%d, pitch[%d], bpp[%d], at %x\n", fb->width, fb->height, fb->pitch, fb->bpp, fb->address);
 
-    for (uint16_t y = 0; y < fb->height; ++y) {
-        for (uint16_t x = 0; x < fb->width; ++x) {
-            draw_pixel(fb, x, y, 0x0000ff);
+    //for (uint16_t y = 0; y < fb->height; ++y) {
+    //    for (uint16_t x = 0; x < fb->width; ++x) {
+    //        draw_pixel(fb, x, y, 0x0000ff);
+    //    }
+    //}
+
+    char c = '@';
+    int index = 0;
+    for (int i = 0; i < font.Chars; ++i) {
+        if (font.Index[i] == (unsigned)c) {
+            index = i;
+            break;
         }
+    }
+
+    printf("found index %d\n", index);
+    index *= font.Height * 2;
+    for (int i = 0; i < font.Height * 2; i += 2) {
+        char glyph = font.Bitmap[index + i];
+        printf("glyph [%x]\n", glyph);
+        for (int8_t bit = 7; bit >= 0; --bit) {
+            uint32_t color = ((glyph >> bit) & 1) ? 0xffffff : 0;
+            printf("bit %d, (%d, %d) = %d\n", bit, 8-bit-1, i/2, color);
+            draw_pixel(fb, 8-bit-1, i/2, color);
+        }
+        printf("ok\n");
     }
 
     smbios_entry *smbios = find_smbios();
@@ -343,8 +374,15 @@ void _start() {
         }
         */
     } else {
-        printf("smbios not found");
+        printf("smbios not found\n");
     }
+
+    efi_system_table_t *ST = (efi_system_table_t*)(efi_request.response->address);
+    for (uint16_t *c = ST->FirmwareVendor; *c; ++c)
+        putchar((uint8_t)*c);
+    putchar('\n');
+    printf("st %x\n", ST);
+    printf("rs %x\n", ST->RuntimeServices);
 
     asm("cli");
     while (true)

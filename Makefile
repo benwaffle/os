@@ -13,10 +13,8 @@ os.iso: os.bin
 		-efi-boot-part --efi-boot-image --protective-msdos-label \
 		isodir -o $@
 
-os.bin: kernel.o linker.ld
-	$(CC) $(CFLAGS) $(LDFLAGS) -T linker.ld -o $@ kernel.o
-
-kernel.o: kernel.c
+os.bin: kernel.o lemon.o linker.ld
+	$(CC) $(CFLAGS) $(LDFLAGS) -T linker.ld -o $@ kernel.o lemon.o
 
 run: os.iso
 	qemu-system-x86_64 \
@@ -26,6 +24,6 @@ run: os.iso
 
 .PHONY: clean
 clean:
-	$(RM) kernel.o
+	$(RM) kernel.o lemon.o
 	$(RM) os.bin
 	$(RM) os.iso
