@@ -8,6 +8,7 @@ LDFLAGS = -lgcc
 OBJS = src/kernel.o \
 		src/smbios.o \
 		src/stdlib.o \
+		src/console.o \
 		src/lemon.o
 
 os.iso: os.bin
