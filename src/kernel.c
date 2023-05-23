@@ -14,6 +14,8 @@ extern void print_smbios();
 
 void _start() {
 
+    init_serial();
+
     printf("\
                           \n\
  ~~~ Welcome to BenOS ~~~ \n\
