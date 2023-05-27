@@ -12,7 +12,51 @@ static volatile struct limine_efi_system_table_request efi_request = {
 
 extern void print_smbios();
 
+typedef struct {
+    u16 offset1;
+    u16 segSel;
+    u8 ist;
+    u8 attrs;
+    u16 offset2;
+    u32 offset3;
+    u32 zero;
+} IdtEnt;
+_Static_assert(sizeof(IdtEnt) == 16); // x86-64
+
+IdtEnt idt[256] = {0};
+
+void myInterrupt() {
+    printf("interrupted!!!\n");
+}
+
+static inline void lidt(void* base, uint16_t size) {
+    struct {
+        uint16_t length;
+        void*    base;
+    } __attribute__((packed)) IDTR = { size, base };
+
+    asm ( "lidt %0" : : "m"(IDTR) );  // let the compiler choose an addressing mode
+}
+
+void initIdt() {
+    idt[42] = (IdtEnt){
+        .offset1 = (u64)(&myInterrupt) & 0xFFFF,
+        .segSel = 5 * 8,
+        .ist = 0,
+        .attrs = 0x8E,
+        .offset2 = ((u64)(&myInterrupt) >> 16) & 0xFFFF,
+        .offset3 = ((u64)(&myInterrupt) >> 32) & 0xFFFFFFFF,
+        .zero = 0,
+    };
+
+    lidt(idt, sizeof(idt));
+}
+
 void _start() {
+
+    asm("cli");
+    initIdt();
+    asm("sti");
 
     init_serial();
 
@@ -30,6 +74,8 @@ void _start() {
     putchar('\n');
     printf("st %x\n", ST);
     printf("rs %x\n", ST->RuntimeServices);
+
+    asm("int $42");
 
     asm("cli");
     while (true)
