@@ -4,6 +4,7 @@
 #include "uefi.h"
 #include "limine.h"
 #include "console.h"
+#include "8259.h"
 
 static volatile struct limine_efi_system_table_request efi_request = {
     .id = LIMINE_EFI_SYSTEM_TABLE_REQUEST,
@@ -27,6 +28,7 @@ IdtEnt idt[256] = {0};
 
 void myInterrupt() {
     printf("interrupted!!!\n");
+    picEoi(2);
     // TODO: do I need iret?
 }
 
@@ -40,7 +42,7 @@ static inline void lidt(void* base, uint16_t size) {
 }
 
 void initIdt() {
-    idt[42] = (IdtEnt){
+    idt[33] = (IdtEnt){
         .offset1 = (u64)(&myInterrupt) & 0xFFFF,
         .segSel = 5 * 8, // limine 64-bit code segment
         .ist = 0,
@@ -59,6 +61,13 @@ void _start() {
     initIdt();
     asm("sti");
 
+    // 0-31 for x86 exceptions
+    // 32-48 for PIC interrupts
+    // 32 - PIT
+    // 33 - PS/2 keyboard
+    picRemap(32);
+    picUnmask(1);
+
     init_serial();
 
     printf("\
@@ -76,9 +85,6 @@ void _start() {
     printf("st %x\n", ST);
     printf("rs %x\n", ST->RuntimeServices);
 
-    asm("int $42");
-
-    asm("cli");
     while (true)
         asm("hlt");
 }

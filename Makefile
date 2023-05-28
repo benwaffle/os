@@ -9,7 +9,8 @@ OBJS = src/kernel.o \
 		src/smbios.o \
 		src/stdlib.o \
 		src/console.o \
-		src/lemon.o
+		src/lemon.o \
+		src/8259.o
 
 os.iso: os.bin
 	cp $< isodir
