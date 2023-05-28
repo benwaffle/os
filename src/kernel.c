@@ -27,6 +27,7 @@ IdtEnt idt[256] = {0};
 
 void myInterrupt() {
     printf("interrupted!!!\n");
+    // TODO: do I need iret?
 }
 
 static inline void lidt(void* base, uint16_t size) {
@@ -41,7 +42,7 @@ static inline void lidt(void* base, uint16_t size) {
 void initIdt() {
     idt[42] = (IdtEnt){
         .offset1 = (u64)(&myInterrupt) & 0xFFFF,
-        .segSel = 5 * 8,
+        .segSel = 5 * 8, // limine 64-bit code segment
         .ist = 0,
         .attrs = 0x8E,
         .offset2 = ((u64)(&myInterrupt) >> 16) & 0xFFFF,

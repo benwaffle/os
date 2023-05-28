@@ -26,7 +26,7 @@ run: os.iso
 	qemu-system-x86_64 \
 		-drive if=pflash,format=raw,unit=0,file=OVMF_CODE.fd,readonly=on \
 		-drive if=pflash,format=raw,unit=1,file=OVMF_VARS.fd \
-		-cdrom $< -serial stdio
+		-cdrom $< -serial mon:stdio
 
 .PHONY: clean
 clean:
