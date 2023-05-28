@@ -22,13 +22,13 @@ typedef struct {
     u32 offset3;
     u32 zero;
 } IdtEnt;
-_Static_assert(sizeof(IdtEnt) == 16); // x86-64
+_Static_assert(sizeof(IdtEnt) == 16, "IDT entry must be 16 bytes on x86-64");
 
 IdtEnt idt[256] = {0};
 
 void myInterrupt() {
-    printf("interrupted!!!\n");
-    picEoi(2);
+    printf("interrupted!!! %x\n", inb(0x60));
+    picEoi(1);
     // TODO: do I need iret?
 }
 
