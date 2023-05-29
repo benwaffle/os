@@ -26,7 +26,7 @@ _Static_assert(sizeof(IdtEnt) == 16, "IDT entry must be 16 bytes on x86-64");
 
 IdtEnt idt[256] = {0};
 
-void myInterrupt() {
+__attribute__((interrupt)) void myInterrupt(void*) {
     printf("interrupted!!! %x\n", inb(0x60));
     picEoi(1);
     // TODO: do I need iret?

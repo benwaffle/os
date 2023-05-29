@@ -2,7 +2,7 @@ AS=x86_64-elf-as
 CC=x86_64-elf-gcc
 LD=x86_64-elf-ld
 
-CFLAGS = -std=gnu17 -ffreestanding -nostdlib -Wall -Wextra -fPIC
+CFLAGS = -std=gnu17 -ffreestanding -nostdlib -Wall -Wextra -fPIC -mgeneral-regs-only
 LDFLAGS = -lgcc
 
 OBJS = src/kernel.o \
