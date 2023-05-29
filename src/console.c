@@ -92,17 +92,41 @@ void draw_char(char c, u8 row, u8 col, u32 color) {
 }
 
 void putchar(char c) {
+    // serial port
     while (!serial_tx_empty())
         ;
 
     outb(COM1, c);
 
+    // screen
     if (c == '\n') {
         ++row;
         if (row == fb_chars_height())
             row = 0;
         col = 0;
         return;
+    }
+
+    if (c == '\t') {
+        col += 4;
+        if (col > fb_chars_width()) {
+            col = 0;
+            row++;
+            if (row == fb_chars_height())
+                row = 0;
+        }
+    }
+
+    if (c == '\b') {
+        if (col == 0) {
+            col = fb_chars_width();
+            if (row != 0)
+                --row;
+        } else {
+            --col;
+        }
+
+        draw_char(' ', row, col, 0xffffff);
     }
 
     draw_char(c, row, col, 0xffffff);
