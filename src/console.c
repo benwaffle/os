@@ -114,6 +114,7 @@ void putchar(output o, char c) {
                 if (row == fb_chars_height())
                     row = 0;
             }
+            return;
         }
 
         if (c == '\b') {
@@ -125,7 +126,8 @@ void putchar(output o, char c) {
                 --col;
             }
 
-            draw_char('X', row, col, 0x0000fe);
+            draw_char(' ', row, col, 0xffffff);
+            return;
         }
 
         draw_char(c, row, col, 0xffffff);
