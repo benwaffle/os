@@ -32,19 +32,19 @@ bool serial_tx_empty() {
     return inb(COM1 + 5) & 0b0100000;
 }
 
-struct limine_framebuffer *fb() {
+struct limine_framebuffer *getFb() {
     return fb_request.response->framebuffers[0];
 }
 
 int fb_chars_height() {
   // at 2x scale
-  int px = fb_request.response->framebuffers[0]->height;
+  int px = getFb()->height;
   return px / font.Height / 2;
 }
 
 int fb_chars_width() {
   // at 2x scale
-  int px = fb_request.response->framebuffers[0]->width;
+  int px = getFb()->width;
   return px / font.Width; // TODO check widths array
 }
 
@@ -86,62 +86,62 @@ void draw_char(char c, u8 row, u8 col, u32 color) {
         char glyph = font.Bitmap[index + j];
         for (s8 bit = 7; bit >= 0; --bit) {
             u32 pixel_color = ((glyph >> bit) & 1) ? color : 0;
-            draw_pixel(fb(), x + 8-bit-1, y + j/2, pixel_color);
+            draw_pixel(getFb(), x + 8-bit-1, y + j/2, pixel_color);
         }
     }
 }
 
-void putchar(char c) {
-    // serial port
-    while (!serial_tx_empty())
-        ;
+void putchar(output o, char c) {
+    if (o == serial) {
+        while (!serial_tx_empty())
+            ;
 
-    outb(COM1, c);
-
-    // screen
-    if (c == '\n') {
-        ++row;
-        if (row == fb_chars_height())
-            row = 0;
-        col = 0;
-        return;
-    }
-
-    if (c == '\t') {
-        col += 4;
-        if (col > fb_chars_width()) {
+        outb(COM1, c);
+    } else if (o == fb) {
+        if (c == '\n') {
+            ++row;
+            if (row == fb_chars_height())
+                row = 0;
             col = 0;
-            row++;
+            return;
+        }
+
+        if (c == '\t') {
+            col += 4;
+            if (col > fb_chars_width()) {
+                col = 0;
+                row++;
+                if (row == fb_chars_height())
+                    row = 0;
+            }
+        }
+
+        if (c == '\b') {
+            if (col == 0) {
+                col = fb_chars_width() - 1;
+                if (row != 0)
+                    --row;
+            } else {
+                --col;
+            }
+
+            draw_char('X', row, col, 0x0000fe);
+        }
+
+        draw_char(c, row, col, 0xffffff);
+        ++col;
+        if (col == fb_chars_width()) {
+            col = 0;
+            ++row;
             if (row == fb_chars_height())
                 row = 0;
         }
     }
-
-    if (c == '\b') {
-        if (col == 0) {
-            col = fb_chars_width();
-            if (row != 0)
-                --row;
-        } else {
-            --col;
-        }
-
-        draw_char(' ', row, col, 0xffffff);
-    }
-
-    draw_char(c, row, col, 0xffffff);
-    ++col;
-    if (col == fb_chars_width()) {
-        col = 0;
-        ++row;
-        if (row == fb_chars_height())
-            row = 0;
-    }
 }
 
-void puts(char *s) {
+void puts(output o, char *s) {
     while (*s) {
-        putchar(*s);
+        putchar(o, *s);
         ++s;
     }
 }
@@ -161,40 +161,58 @@ int numeric_width(int i, int base) {
     return len;
 }
 
-void print_number(int i, int base) {
+void print_number(output out, int i, int base) {
     int len = numeric_width(i, base);
-    char out[len + 1];
+    char result[len + 1];
     for (int k = 0; k < len; ++k) {
-        out[len - k - 1] = hex[i % base];
+        result[len - k - 1] = hex[i % base];
         i /= base;
     }
-    out[len] = 0;
-    puts(out);
+    result[len] = 0;
+    puts(out, result);
 }
 
-void printf(const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-
+void vfprintf(const output out, const char *fmt, va_list args) {
     while (*fmt) {
         if (fmt[0] == '%') {
             if (fmt[1] == 'd') {
-                print_number(va_arg(args, int), 10);
+                print_number(out, va_arg(args, int), 10);
             } else if (fmt[1] == 'x') {
-                puts("0x");
-                print_number(va_arg(args, uint64_t), 16);
+                puts(out, "0x");
+                print_number(out, va_arg(args, uint64_t), 16);
             } else if (fmt[1] == 's') {
-                puts(va_arg(args, char*));
+                puts(out, va_arg(args, char*));
+            } else if (fmt[1] == 'c') {
+                putchar(out, va_arg(args, int));
             } else {
-                puts("%?");
+                puts(out, "%?");
             }
             ++fmt;
         } else {
-            putchar(*fmt);
+            putchar(out, *fmt);
         }
 
         ++fmt;
     }
+}
+
+void fprintf(const output out, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+
+    vfprintf(out, fmt, args);
 
     va_end(args);
+}
+
+void printf(const char *fmt, ...) {
+    va_list args1, args2;
+    va_start(args1, fmt);
+    va_copy(args2, args1);
+
+    vfprintf(fb, fmt, args1);
+    vfprintf(serial, fmt, args2);
+
+    va_end(args1);
+    va_end(args2);
 }

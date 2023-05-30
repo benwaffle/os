@@ -27,6 +27,7 @@ _Static_assert(sizeof(IdtEnt) == 16, "IDT entry must be 16 bytes on x86-64");
 IdtEnt idt[256] = {0};
 
 u8 scanCodes[256] = {
+    [0x01] = '\e',
     [0x02] = '1',
     [0x03] = '2',
     [0x04] = '3',
@@ -79,12 +80,13 @@ u8 scanCodes[256] = {
     [0x33] = ',',
     [0x34] = '.',
     [0x35] = '/',
+    [0x39] = ' ',
 };
 
 __attribute__((interrupt)) void myInterrupt(void*) {
     u8 c = scanCodes[inb(0x60)];
     if (c)
-        putchar(c);
+        printf("%c", c);
     picEoi(1);
 }
 
@@ -136,8 +138,8 @@ void _start() {
 
     efi_system_table_t *ST = (efi_system_table_t*)(efi_request.response->address);
     for (uint16_t *c = ST->FirmwareVendor; *c; ++c)
-        putchar((uint8_t)*c);
-    putchar('\n');
+        printf("%c", (uint8_t)*c);
+    printf("\n");
     printf("st %x\n", ST);
     printf("rs %x\n", ST->RuntimeServices);
 
