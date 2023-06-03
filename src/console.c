@@ -150,46 +150,63 @@ void puts(output o, char *s) {
 
 const char *hex = "0123456789abcdef";
 
-int numeric_width(int i, int base) {
-    int len = 0;
+#define MAX_NUM_WIDTH 16 // 0xffffffffffffffff
+
+void print_number(output out, int i, int base, u8 minWidth, bool padWithZeros) {
+    char result[MAX_NUM_WIDTH + 1] = {0};
+    u8 pos = 0;
 
     while (i) {
-        len++;
+        result[pos] = hex[i % base];
         i /= base;
+        pos++;
     }
 
-    if (len == 0)
-        len = 1;
-    return len;
-}
-
-void print_number(output out, int i, int base) {
-    int len = numeric_width(i, base);
-    char result[len + 1];
-    for (int k = 0; k < len; ++k) {
-        result[len - k - 1] = hex[i % base];
-        i /= base;
+    if (pos < minWidth) {
+        for (u8 j = pos; j < minWidth; ++j) {
+            if (padWithZeros)
+                result[j] = '0';
+            else
+                result[j] = ' ';
+        }
     }
-    result[len] = 0;
-    puts(out, result);
+
+    for (s8 j = MAX_NUM_WIDTH; j >= 0; --j)
+        if (result[j])
+            putchar(out, result[j]);
 }
 
 void vfprintf(const output out, const char *fmt, va_list args) {
     while (*fmt) {
         if (fmt[0] == '%') {
-            if (fmt[1] == 'd') {
-                print_number(out, va_arg(args, int), 10);
-            } else if (fmt[1] == 'x') {
+            u8 pos = 1;
+            bool padWithZeros = false;
+            u8 minWidth = 0;
+
+            if (fmt[pos] == '0') {
+                padWithZeros = true;
+                ++pos;
+            }
+
+            while ('0' <= fmt[pos] && fmt[pos] <= '9') {
+                minWidth *= 10;
+                minWidth += fmt[pos] - '0';
+                ++pos;
+            }
+
+            if (fmt[pos] == 'd') {
+                print_number(out, va_arg(args, int), 10, minWidth, padWithZeros);
+            } else if (fmt[pos] == 'x') {
                 puts(out, "0x");
-                print_number(out, va_arg(args, uint64_t), 16);
-            } else if (fmt[1] == 's') {
+                print_number(out, va_arg(args, uint64_t), 16, minWidth, padWithZeros);
+            } else if (fmt[pos] == 's') {
                 puts(out, va_arg(args, char*));
-            } else if (fmt[1] == 'c') {
+            } else if (fmt[pos] == 'c') {
                 putchar(out, va_arg(args, int));
             } else {
                 puts(out, "%?");
             }
-            ++fmt;
+            fmt += pos;
         } else {
             putchar(out, *fmt);
         }
