@@ -11,6 +11,11 @@ static volatile struct limine_efi_system_table_request efi_request = {
     .revision = 0,
 };
 
+static volatile struct limine_memmap_request memmap_request = {
+    .id = LIMINE_MEMMAP_REQUEST,
+    .revision = 0,
+};
+
 extern void print_smbios();
 
 typedef struct {
@@ -113,6 +118,27 @@ void initIdt() {
     lidt(idt, sizeof(idt));
 }
 
+const char *memMapTypeStrings[] = {
+    [LIMINE_MEMMAP_USABLE] = "usable",
+    [LIMINE_MEMMAP_RESERVED] = "reserved",
+    [LIMINE_MEMMAP_ACPI_RECLAIMABLE] = "acpi-reclaimable",
+    [LIMINE_MEMMAP_ACPI_NVS] = "acpi-nvs",
+    [LIMINE_MEMMAP_BAD_MEMORY] = "bad-memory",
+    [LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE] = "bootloader-reclaimable",
+    [LIMINE_MEMMAP_KERNEL_AND_MODULES] = "kernel-and-modules",
+    [LIMINE_MEMMAP_FRAMEBUFFER] = "framebuffer",
+};
+
+void printMemMap() {
+    printf("Memory map:\n");
+    for (u16 i = 0; i < memmap_request.response->entry_count; ++i) {
+        struct limine_memmap_entry *entry = memmap_request.response->entries[i];
+        printf("%x - %x: %s\n", entry->base, entry->base + entry->length, memMapTypeStrings[entry->type]);
+    }
+
+    printf("\n");
+}
+
 void _start() {
 
     asm("cli");
@@ -133,6 +159,8 @@ void _start() {
  ~~~ Welcome to BenOS ~~~ \n\
                           \n\
 ");
+
+    printMemMap();
 
     print_smbios();
 
