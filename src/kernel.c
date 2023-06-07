@@ -129,11 +129,25 @@ const char *memMapTypeStrings[] = {
     [LIMINE_MEMMAP_FRAMEBUFFER] = "framebuffer",
 };
 
+void printBytes(u64 nBytes) {
+    if (nBytes > 1024 * 1024 * 1024) {
+        printf("%u GB", nBytes / 1024 / 1024 / 1024);
+    } else if (nBytes > 1024 * 1024) {
+        printf("%u MB", nBytes / 1024 / 1024);
+    } else if (nBytes > 1024) {
+        printf("%u KB", nBytes / 1024);
+    } else {
+        printf("%u B", nBytes);
+    }
+}
+
 void printMemMap() {
     printf("Memory map:\n");
     for (u16 i = 0; i < memmap_request.response->entry_count; ++i) {
         struct limine_memmap_entry *entry = memmap_request.response->entries[i];
-        printf("%x - %x: %s\n", entry->base, entry->base + entry->length, memMapTypeStrings[entry->type]);
+        printf("%x - %x (", entry->base, entry->base + entry->length);
+        printBytes(entry->length);
+        printf("): %s\n",  memMapTypeStrings[entry->type]);
     }
 
     printf("\n");

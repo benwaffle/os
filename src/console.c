@@ -185,7 +185,6 @@ void printSigned(output out, s64 i, u8 base, u8 minWidth, bool padWithZeros) {
     printUnsigned(out, (u64)i, base, minWidth, padWithZeros);
 }
 
-
 void vfprintf(const output out, const char *fmt, va_list args) {
     while (*fmt) {
         if (fmt[0] == '%') {
