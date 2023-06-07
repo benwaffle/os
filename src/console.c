@@ -152,7 +152,7 @@ const char *hex = "0123456789abcdef";
 
 #define MAX_NUM_WIDTH 16 // 0xffffffffffffffff
 
-void print_number(output out, int i, int base, u8 minWidth, bool padWithZeros) {
+void printUnsigned(output out, u64 i, u8 base, u8 minWidth, bool padWithZeros) {
     char result[MAX_NUM_WIDTH + 1] = {0};
     u8 pos = 0;
 
@@ -176,6 +176,16 @@ void print_number(output out, int i, int base, u8 minWidth, bool padWithZeros) {
             putchar(out, result[j]);
 }
 
+void printSigned(output out, s64 i, u8 base, u8 minWidth, bool padWithZeros) {
+    if (i < 0) {
+        putchar(out, '-');
+        i = -i;
+    }
+
+    printUnsigned(out, (u64)i, base, minWidth, padWithZeros);
+}
+
+
 void vfprintf(const output out, const char *fmt, va_list args) {
     while (*fmt) {
         if (fmt[0] == '%') {
@@ -195,10 +205,12 @@ void vfprintf(const output out, const char *fmt, va_list args) {
             }
 
             if (fmt[pos] == 'd') {
-                print_number(out, va_arg(args, int), 10, minWidth, padWithZeros);
+                printSigned(out, va_arg(args, s32), 10, minWidth, padWithZeros);
+            } else if (fmt[pos] == 'u') {
+                printUnsigned(out, va_arg(args, u32), 10, minWidth, padWithZeros);
             } else if (fmt[pos] == 'x') {
                 puts(out, "0x");
-                print_number(out, va_arg(args, uint64_t), 16, minWidth, padWithZeros);
+                printUnsigned(out, va_arg(args, uint64_t), 16, minWidth, padWithZeros);
             } else if (fmt[pos] == 's') {
                 puts(out, va_arg(args, char*));
             } else if (fmt[pos] == 'c') {

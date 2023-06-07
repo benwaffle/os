@@ -133,7 +133,7 @@ void printMemMap() {
     printf("Memory map:\n");
     for (u16 i = 0; i < memmap_request.response->entry_count; ++i) {
         struct limine_memmap_entry *entry = memmap_request.response->entries[i];
-        printf("%08x - %08x: %s\n", entry->base, entry->base + entry->length, memMapTypeStrings[entry->type]);
+        printf("%x - %x: %s\n", entry->base, entry->base + entry->length, memMapTypeStrings[entry->type]);
     }
 
     printf("\n");
