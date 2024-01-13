@@ -2,3 +2,5 @@
 *~
 os.bin
 *.iso
+.direnv/
+.envrc
